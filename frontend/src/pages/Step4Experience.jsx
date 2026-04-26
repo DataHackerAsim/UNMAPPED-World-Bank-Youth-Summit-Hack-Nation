@@ -2,22 +2,28 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useCountry } from '../context/CountryContext'
+import { useFlow } from '../context/FlowContext'
 import Shell from '../components/ui/Shell'
 
-export default function Step4Experience({ updateForm, formData }) {
+export default function Step4Experience() {
   const { t } = useTranslation()
   const { config } = useCountry()
+  const { updateForm, markStepComplete, formData } = useFlow()
   const navigate = useNavigate()
   const [sector, setSector] = useState(formData.sector || '')
   const [years, setYears] = useState(formData.years_experience || '')
   const [description, setDescription] = useState(formData.experience_description || '')
 
+  const yearsNum = Number(years)
+  const yearsValid = years !== '' && Number.isFinite(yearsNum) && yearsNum >= 0 && yearsNum <= 50
+  const isValid = !!sector && yearsValid && description.trim().length > 20
+
   const handleNext = () => {
+    if (!isValid) return
     updateForm({ sector, years_experience: years, experience_description: description })
+    markStepComplete(4)
     navigate('/step5')
   }
-
-  const isValid = sector && years && description.length > 20
 
   const charTarget = 120
   const charPct = Math.min((description.length / charTarget) * 100, 100)
@@ -48,8 +54,9 @@ export default function Step4Experience({ updateForm, formData }) {
       <div className="flex flex-col gap-6 mb-8">
         {/* Sector */}
         <div className="fade-up fade-up-1">
-          <label className="form-label">Primary work area</label>
+          <label htmlFor="step4-sector" className="form-label">Primary work area</label>
           <select
+            id="step4-sector"
             value={sector}
             onChange={e => setSector(e.target.value)}
             className="dark-select"
@@ -63,8 +70,9 @@ export default function Step4Experience({ updateForm, formData }) {
 
         {/* Years */}
         <div className="fade-up fade-up-2">
-          <label className="form-label">Years of experience</label>
+          <label htmlFor="step4-years" className="form-label">Years of experience</label>
           <input
+            id="step4-years"
             type="number"
             min="0"
             max="50"
@@ -73,12 +81,16 @@ export default function Step4Experience({ updateForm, formData }) {
             placeholder="e.g. 3"
             className="dark-input"
           />
+          {years !== '' && !yearsValid && (
+            <p className="text-[0.72rem] text-[#fca5a5] mt-1">Enter a number between 0 and 50.</p>
+          )}
         </div>
 
         {/* Description */}
         <div className="fade-up fade-up-3">
-          <label className="form-label">Describe what you actually do</label>
+          <label htmlFor="step4-desc" className="form-label">Describe what you actually do</label>
           <textarea
+            id="step4-desc"
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={5}

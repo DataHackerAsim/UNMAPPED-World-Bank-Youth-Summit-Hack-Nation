@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
+import { useFlow } from '../context/FlowContext'
+import { getEmploymentData } from '../api/client'
 import Shell from '../components/ui/Shell'
 import SkillTag from '../components/ui/SkillTag'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
@@ -18,15 +20,39 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function RiskView({ fetchRisk, risk, loading, error }) {
+export default function RiskView() {
   const navigate = useNavigate()
+  const { fetchRisk, risk, loading, error, profile } = useFlow()
+  const fetchedRef = useRef(false)
+
+  // ILO employment data — keyed by ISCO+country, fetched once per profile.
+  // The backend returns thousands of workers (not a share), so the label
+  // below reflects that honestly.
+  const [employment, setEmployment] = useState(null) // { employment_thousands, isco_2digit, country } | null
+  const [employmentError, setEmploymentError] = useState(false)
 
   useEffect(() => {
-    if (!risk) fetchRisk().catch(() => {})
-  }, [])
+    if (fetchedRef.current) return
+    if (!profile) return
+    if (risk) return
+    fetchedRef.current = true
+    fetchRisk().catch(() => {})
+  }, [profile, risk, fetchRisk])
+
+  useEffect(() => {
+    if (!profile) return
+    const isco = profile.skills?.isco_codes?.[0]
+    const country = profile.country_config || profile._raw?.country_code
+    if (!isco || isco === '0000' || !country) return
+    let cancelled = false
+    getEmploymentData(isco, country)
+      .then(data => { if (!cancelled) setEmployment(data) })
+      .catch(() => { if (!cancelled) setEmploymentError(true) })
+    return () => { cancelled = true }
+  }, [profile])
 
   /* ── Loading ── */
-  if (loading) {
+  if (loading && !risk) {
     return (
       <Shell>
         <div className="max-w-2xl mx-auto">
@@ -44,12 +70,39 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
     )
   }
 
+  /* ── Error state (non-loading) ── */
+  if (error && !risk) {
+    return (
+      <Shell>
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="w-2 h-2 rounded-full bg-amber mb-4" />
+          <p className="font-mono text-amber text-sm mb-2">Risk assessment unavailable</p>
+          <p className="font-mono text-text-secondary text-xs mb-6 max-w-md">{error}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/step5')}
+              className="px-6 py-3 border border-border rounded-lg font-mono text-xs text-text-secondary hover:border-amber/40"
+            >
+              ← BACK TO PROFILE
+            </button>
+            <button
+              onClick={() => { fetchedRef.current = true; fetchRisk().catch(() => {}) }}
+              className="px-6 py-3 bg-green hover:bg-green-dim text-black font-display font-bold rounded-lg text-sm"
+            >
+              RETRY →
+            </button>
+          </div>
+        </div>
+      </Shell>
+    )
+  }
+
   if (!risk) return null
 
-  const globalPct    = Math.round(risk.automation_score_global * 100)
-  const calibPct     = Math.round(risk.automation_score_lmic_calibrated * 100)
-  const riskColor    = calibPct < 40 ? 'text-green' : calibPct < 65 ? 'text-amber' : 'text-red'
-  const riskBarColor = calibPct < 40 ? 'bg-green'   : calibPct < 65 ? 'bg-amber'   : 'bg-red'
+  const globalPct = Math.round(risk.automation_score_global * 100)
+  const calibPct = Math.round(risk.automation_score_lmic_calibrated * 100)
+  const riskColor = calibPct < 40 ? 'text-green' : calibPct < 65 ? 'text-amber' : 'text-red'
+  const riskBarColor = calibPct < 40 ? 'bg-green' : calibPct < 65 ? 'bg-amber' : 'bg-red'
 
   return (
     <Shell>
@@ -71,7 +124,6 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
 
         {/* ── ECONOMETRIC SIGNAL 1: Automation Score ── */}
         <div className="bg-surface border border-border rounded-lg p-6 mb-4 fade-in-up delay-1 relative overflow-hidden">
-          {/* Background number */}
           <div className={`absolute right-4 top-1/2 -translate-y-1/2 font-display font-extrabold text-8xl opacity-5 ${riskColor}`}>
             {calibPct}
           </div>
@@ -93,7 +145,6 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
             </div>
           </div>
 
-          {/* Risk bar */}
           <div className="h-2 bg-raised rounded-full overflow-hidden mb-3">
             <div
               className={`h-2 rounded-full fill-bar ${riskBarColor}`}
@@ -101,7 +152,6 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
             />
           </div>
 
-          {/* Scale labels */}
           <div className="flex justify-between font-mono text-[9px] text-text-muted mb-4">
             <span>LOW RISK</span>
             <span>MODERATE</span>
@@ -111,10 +161,46 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
           <p className="font-mono text-xs text-text-secondary italic">{risk.calibration_note}</p>
         </div>
 
-        {/* Data source attribution */}
         <p className="font-mono text-[10px] text-text-muted mb-6 fade-in-up delay-1">
           Source: Frey & Osborne (2013) · ILO Task Indices · LMIC calibration applied
         </p>
+
+        {/* ── ILO Employment Share — live ILOSTAT lookup ── */}
+        <div className="bg-surface border border-border rounded-lg p-5 mb-6 fade-in-up delay-1">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-1 h-1 rounded-full bg-green" />
+                <span className="font-mono text-[10px] tracking-widest text-text-secondary uppercase">
+                  ILO Employment Share · Your Region
+                </span>
+              </div>
+              <p className="font-mono text-[10px] text-text-muted">
+                ILOSTAT live SDMX lookup for ISCO {employment?.isco_2digit || '—'} ·
+                country {employment?.country || profile.country_config || '—'}
+              </p>
+            </div>
+            <div className="text-right">
+              {employment === null && !employmentError && (
+                <p className="font-mono text-xs text-text-secondary">Loading…</p>
+              )}
+              {employmentError && (
+                <p className="font-mono text-xs text-text-secondary">Unavailable</p>
+              )}
+              {employment && employment.employment_thousands != null && (
+                <>
+                  <p className="font-display text-2xl font-bold text-green">
+                    {Math.round(employment.employment_thousands).toLocaleString()}k
+                  </p>
+                  <p className="font-mono text-[10px] text-text-secondary">workers in 2-digit ISCO group</p>
+                </>
+              )}
+              {employment && employment.employment_thousands == null && (
+                <p className="font-mono text-xs text-text-secondary">No data for this pair</p>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* ── 3-zone skill breakdown ── */}
         <div className="flex items-center gap-3 mb-4 fade-in-up delay-2">
@@ -123,40 +209,37 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-6 fade-in-up delay-2">
-          {/* At risk */}
           <div className="bg-red-faint border border-red-dim rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-red" />
               <p className="font-mono text-[9px] tracking-widest text-red uppercase">At Risk</p>
             </div>
             <div className="space-y-2">
-              {risk.at_risk_tasks.map(s => (
+              {(risk.at_risk_tasks ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="risk" />
               ))}
             </div>
           </div>
 
-          {/* Durable */}
           <div className="bg-green-faint border border-green-muted rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-green" />
               <p className="font-mono text-[9px] tracking-widest text-green uppercase">Durable</p>
             </div>
             <div className="space-y-2">
-              {risk.durable_skills.map(s => (
+              {(risk.durable_skills ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="durable" />
               ))}
             </div>
           </div>
 
-          {/* Adjacent */}
           <div className="bg-amber-faint border border-amber-dim rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-amber" />
               <p className="font-mono text-[9px] tracking-widest text-amber uppercase">Adjacent</p>
             </div>
             <div className="space-y-2">
-              {risk.adjacent_skills.map(s => (
+              {(risk.adjacent_skills ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="adjacent" />
               ))}
             </div>
@@ -164,68 +247,48 @@ export default function RiskView({ fetchRisk, risk, loading, error }) {
         </div>
 
         {/* ── ECONOMETRIC SIGNAL 2: Wittgenstein Trend ── */}
-        <div className="bg-surface border border-border rounded-lg p-6 mb-6 fade-in-up delay-3">
-          <div className="flex items-start justify-between mb-1">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-1 h-1 rounded-full bg-green" />
-                <span className="font-mono text-[10px] tracking-widest text-text-secondary uppercase">
-                  Education Completion Trend · Your Region
-                </span>
+        {risk.wittgenstein_trend?.length > 0 && (
+          <div className="bg-surface border border-border rounded-lg p-6 mb-6 fade-in-up delay-3">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1 h-1 rounded-full bg-green" />
+                  <span className="font-mono text-[10px] tracking-widest text-text-secondary uppercase">
+                    Education Completion Trend · Your Region
+                  </span>
+                </div>
+                <p className="font-mono text-[10px] text-text-muted">
+                  Wittgenstein Centre projections 2025–2035 · Secondary level
+                </p>
               </div>
-              <p className="font-mono text-[10px] text-text-muted">
-                Wittgenstein Centre projections 2025–2035 · Secondary level
+              <div className="text-right">
+                <p className="font-display text-2xl font-bold text-green">
+                  {risk.wittgenstein_trend[risk.wittgenstein_trend.length - 1].pct}%
+                </p>
+                <p className="font-mono text-[10px] text-text-secondary">by 2035</p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={risk.wittgenstein_trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="year" tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={{ stroke: '#1f2937' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={false} tickLine={false} unit="%" domain={[30, 60]} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine y={risk.wittgenstein_trend[0].pct} stroke="#1f2937" strokeDasharray="4 4" />
+                  <Line type="monotone" dataKey="pct" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#22c55e', stroke: '#052e16', strokeWidth: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="font-mono text-[10px] text-text-secondary leading-relaxed">
+                <span className="text-amber">↑ Rising completion rates</span> increase credential competition in your region.
+                Skill differentiation matters more than credentials alone over the next decade.
               </p>
             </div>
-            <div className="text-right">
-              <p className="font-display text-2xl font-bold text-green">
-                {risk.wittgenstein_trend[risk.wittgenstein_trend.length - 1].pct}%
-              </p>
-              <p className="font-mono text-[10px] text-text-secondary">by 2035</p>
-            </div>
           </div>
-
-          <div className="mt-6">
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={risk.wittgenstein_trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <XAxis
-                  dataKey="year"
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={{ stroke: '#1f2937' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={false}
-                  tickLine={false}
-                  unit="%"
-                  domain={[30, 60]}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine
-                  y={risk.wittgenstein_trend[0].pct}
-                  stroke="#1f2937"
-                  strokeDasharray="4 4"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="pct"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: '#22c55e', stroke: '#052e16', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="font-mono text-[10px] text-text-secondary leading-relaxed">
-              <span className="text-amber">↑ Rising completion rates</span> increase credential competition in your region.
-              Skill differentiation matters more than credentials alone over the next decade.
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* CTA */}
         <button

@@ -25,15 +25,22 @@ const ChartTooltip = ({ active, payload, label }) => {
 }
 
 export default function PolicyDashboard() {
-  const navigate   = useNavigate()
+  const navigate = useNavigate()
   const { config } = useCountry()
-  const [data, setData]       = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setData(null)
-    getPolicyData(config.code).then(setData).finally(() => setLoading(false))
+    setError(null)
+    getPolicyData(config.code)
+      .then(d => { if (!cancelled) setData(d) })
+      .catch(() => { if (!cancelled) setError('Policy data unavailable for this region.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [config.code])
 
   if (loading) {
@@ -59,7 +66,25 @@ export default function PolicyDashboard() {
     )
   }
 
-  if (!data) return null
+  if (error || !data) {
+    return (
+      <Shell>
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="w-2 h-2 rounded-full bg-amber mb-4" />
+          <p className="font-mono text-amber text-sm mb-2">Dashboard unavailable</p>
+          <p className="font-mono text-text-secondary text-xs mb-6 max-w-md">
+            {error ?? 'No data returned for this region.'}
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 border border-border rounded-lg font-mono text-xs text-text-secondary hover:border-amber/40"
+          >
+            ← CHANGE CONTEXT
+          </button>
+        </div>
+      </Shell>
+    )
+  }
 
   return (
     <Shell>
@@ -133,27 +158,12 @@ export default function PolicyDashboard() {
                 layout="vertical"
                 margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
               >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={{ stroke: '#1f2937' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="level"
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={80}
-                />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={{ stroke: '#1f2937' }} tickLine={false} />
+                <YAxis type="category" dataKey="level" tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={false} tickLine={false} width={80} />
                 <Tooltip content={<ChartTooltip />} />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                   {data.skills_distribution.map((_, i) => (
-                    <Cell
-                      key={i}
-                      fill={i === 0 ? '#7f1d1d' : i === 1 ? '#14532d' : i === 2 ? '#22c55e' : i === 3 ? '#f59e0b' : '#16a34a'}
-                    />
+                    <Cell key={i} fill={i === 0 ? '#7f1d1d' : i === 1 ? '#14532d' : i === 2 ? '#22c55e' : i === 3 ? '#f59e0b' : '#16a34a'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -172,28 +182,15 @@ export default function PolicyDashboard() {
               Source: ILO ILOSTAT · World Bank Enterprise Surveys
             </p>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={data.sector_gap}
-                margin={{ top: 0, right: 16, left: -20, bottom: 0 }}
-              >
-                <XAxis
-                  dataKey="sector"
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={{ stroke: '#1f2937' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+              <BarChart data={data.sector_gap} margin={{ top: 0, right: 16, left: -20, bottom: 0 }}>
+                <XAxis dataKey="sector" tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={{ stroke: '#1f2937' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'Space Mono' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Bar dataKey="demand" name="Demand" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="supply" name="Supply"  fill="#14532d" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="supply" name="Supply" fill="#14532d" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Legend */}
             <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm bg-green" />

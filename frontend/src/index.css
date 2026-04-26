@@ -101,6 +101,10 @@
 .sidebar-nav-item:hover { background: var(--color-sidebar-surface); color: var(--color-sidebar-text); }
 .sidebar-nav-item.active { background: rgba(26, 168, 130, 0.12); color: var(--color-teal-400); font-weight: 500; }
 .sidebar-nav-item.done { color: var(--color-teal-600); }
+.sidebar-nav-item.locked {
+  opacity: 0.45; cursor: not-allowed; pointer-events: auto;
+}
+.sidebar-nav-item.locked:hover { background: transparent; color: var(--color-sidebar-muted); }
 
 .sidebar-nav-icon {
   width: 18px; height: 18px; color: var(--color-sidebar-muted);

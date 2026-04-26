@@ -1,20 +1,32 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Shell from '../components/ui/Shell'
 import OpportunityCard from '../components/ui/OpportunityCard'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import { useCountry } from '../context/CountryContext'
+import { useFlow } from '../context/FlowContext'
 
-export default function OpportunitiesView({ fetchOpportunities, opportunities, loading }) {
-  const navigate   = useNavigate()
+export default function OpportunitiesView() {
+  const navigate = useNavigate()
   const { config } = useCountry()
+  const { fetchOpportunities, opportunities, loading, error, profile, resetFlow } = useFlow()
+  const fetchedRef = useRef(false)
 
   useEffect(() => {
-    if (!opportunities) fetchOpportunities().catch(() => {})
-  }, [])
+    if (fetchedRef.current) return
+    if (!profile) return
+    if (opportunities) return
+    fetchedRef.current = true
+    fetchOpportunities().catch(() => {})
+  }, [profile, opportunities, fetchOpportunities])
+
+  const handleNewProfile = () => {
+    resetFlow()
+    navigate('/')
+  }
 
   /* ── Loading ── */
-  if (loading) {
+  if (loading && !opportunities) {
     return (
       <Shell>
         <div className="max-w-2xl mx-auto">
@@ -38,12 +50,47 @@ export default function OpportunitiesView({ fetchOpportunities, opportunities, l
     )
   }
 
-  if (!opportunities) return null
+  /* ── Error ── */
+  if (error && !opportunities) {
+    return (
+      <Shell>
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="w-2 h-2 rounded-full bg-amber mb-4" />
+          <p className="font-mono text-amber text-sm mb-2">Opportunities unavailable</p>
+          <p className="font-mono text-text-secondary text-xs mb-6 max-w-md">{error}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/risk')}
+              className="px-6 py-3 border border-border rounded-lg font-mono text-xs text-text-secondary hover:border-amber/40"
+            >
+              ← BACK TO RISK
+            </button>
+            <button
+              onClick={() => { fetchedRef.current = true; fetchOpportunities().catch(() => {}) }}
+              className="px-6 py-3 bg-green hover:bg-green-dim text-black font-display font-bold rounded-lg text-sm"
+            >
+              RETRY →
+            </button>
+          </div>
+        </div>
+      </Shell>
+    )
+  }
+
+  if (!opportunities || opportunities.length === 0) {
+    return (
+      <Shell>
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <p className="font-mono text-text-secondary text-sm">No opportunities matched yet.</p>
+        </div>
+      </Shell>
+    )
+  }
 
   /* Aggregate stats for summary bar */
-  const avgWage    = Math.round(opportunities.reduce((s, o) => s + o.wage_floor_usd_month, 0) / opportunities.length)
-  const avgGrowth  = (opportunities.reduce((s, o) => s + o.sector_growth_pct, 0) / opportunities.length).toFixed(1)
-  const immediate  = opportunities.filter(o => o.pathway === 'immediate').length
+  const avgWage = Math.round(opportunities.reduce((s, o) => s + o.wage_floor_usd_month, 0) / opportunities.length)
+  const avgGrowth = (opportunities.reduce((s, o) => s + o.sector_growth_pct, 0) / opportunities.length).toFixed(1)
+  const immediate = opportunities.filter(o => o.pathway === 'immediate').length
 
   return (
     <Shell>
@@ -132,7 +179,7 @@ export default function OpportunitiesView({ fetchOpportunities, opportunities, l
             ← RISK VIEW
           </button>
           <button
-            onClick={() => navigate('/step1')}
+            onClick={handleNewProfile}
             className="py-4 border border-green/40 bg-green-faint text-green font-display font-bold rounded-lg hover:bg-green-muted transition-colors text-sm"
           >
             NEW PROFILE

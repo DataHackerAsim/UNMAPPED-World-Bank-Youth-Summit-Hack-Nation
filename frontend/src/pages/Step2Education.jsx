@@ -2,16 +2,20 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useCountry } from '../context/CountryContext'
+import { useFlow } from '../context/FlowContext'
 import Shell from '../components/ui/Shell'
 
-export default function Step2Education({ updateForm, formData }) {
+export default function Step2Education() {
   const { t } = useTranslation()
   const { config } = useCountry()
+  const { updateForm, markStepComplete, formData } = useFlow()
   const navigate = useNavigate()
   const [selected, setSelected] = useState(formData.education_level || '')
 
   const handleNext = () => {
+    if (!selected) return
     updateForm({ education_level: selected })
+    markStepComplete(2)
     navigate('/step3')
   }
 
@@ -35,6 +39,7 @@ export default function Step2Education({ updateForm, formData }) {
             <button
               key={level.value}
               onClick={() => setSelected(level.value)}
+              aria-pressed={active}
               className={`fade-up fade-up-${Math.min(i + 1, 4)} w-full text-left px-5 py-4 rounded-xl border-2 transition-all duration-200 flex items-center justify-between gap-4
                 ${active
                   ? 'border-[#1aA882] bg-[#1aA882]/8'
@@ -65,7 +70,7 @@ export default function Step2Education({ updateForm, formData }) {
 
       {/* Nav buttons */}
       <div className="flex gap-3 fade-up fade-up-4">
-        <button onClick={() => navigate('/step1')} className="btn-ghost flex-1">
+        <button onClick={() => navigate('/')} className="btn-ghost flex-1">
           {t('btn_back')}
         </button>
         <button className="btn-primary flex-1" onClick={handleNext} disabled={!selected}>

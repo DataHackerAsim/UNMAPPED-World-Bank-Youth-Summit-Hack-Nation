@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useFlow } from '../context/FlowContext'
 import Shell from '../components/ui/Shell'
 
 const LANGUAGES = [
@@ -9,8 +10,9 @@ const LANGUAGES = [
   'Urdu', 'Tagalog', 'Portuguese', 'Spanish', 'Mandarin',
 ]
 
-export default function Step3Languages({ updateForm, formData }) {
+export default function Step3Languages() {
   const { t } = useTranslation()
+  const { updateForm, markStepComplete, formData } = useFlow()
   const navigate = useNavigate()
   const [selected, setSelected] = useState(formData.languages || [])
 
@@ -21,7 +23,9 @@ export default function Step3Languages({ updateForm, formData }) {
   }
 
   const handleNext = () => {
+    if (selected.length === 0) return
     updateForm({ languages: selected })
+    markStepComplete(3)
     navigate('/step4')
   }
 
@@ -45,6 +49,7 @@ export default function Step3Languages({ updateForm, formData }) {
             <button
               key={lang}
               onClick={() => toggle(lang)}
+              aria-pressed={active}
               className={`px-4 py-2 rounded-full border transition-all duration-200 text-[0.84rem] font-medium
                 ${active
                   ? 'bg-[#1aA882] border-[#1aA882] text-white shadow-[0_2px_12px_rgba(26,168,130,0.3)]'
