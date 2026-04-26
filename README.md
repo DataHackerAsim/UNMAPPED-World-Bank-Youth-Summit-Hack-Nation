@@ -100,6 +100,4 @@ ESCO, ISCO-08, O*NET, Frey-Osborne, World Bank HCI/WDI, ILOSTAT, Wittgenstein, U
 
 ---
 
-## Team
 
-Solo developer — World Bank Youth Summit × Hack-Nation 2026
