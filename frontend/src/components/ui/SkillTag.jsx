@@ -41,14 +41,16 @@ export default function SkillTag({ label, variant = 'default', showDot = false }
       alignItems: 'center',
       gap: '5px',
       padding: '4px 12px',
-      borderRadius: '999px',
+      borderRadius: '14px',
       fontSize: '0.78rem',
       fontWeight: '500',
       fontFamily: "'DM Sans', sans-serif",
       letterSpacing: '0.01em',
       lineHeight: 1.4,
       transition: 'opacity 0.15s ease',
-      whiteSpace: 'nowrap',
+      maxWidth: '100%',
+      overflowWrap: 'anywhere',
+      wordBreak: 'break-word',
     }}>
       {showDot && (
         <span style={{

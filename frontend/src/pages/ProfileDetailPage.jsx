@@ -9,9 +9,9 @@ import { useAuth } from '../context/AuthContext'
 
 function Field({ label, children }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="font-mono text-[10px] tracking-widest text-text-secondary uppercase mb-1">{label}</p>
-      <p className="text-sm text-text-primary">{children ?? <span className="text-text-muted italic">—</span>}</p>
+      <p className="text-sm text-text-primary wrap-break-word">{children ?? <span className="text-text-muted italic">—</span>}</p>
     </div>
   )
 }
@@ -115,8 +115,8 @@ export default function ProfileDetailPage() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-6 pb-4 border-b border-border flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <div className="w-1.5 h-1.5 rounded-full bg-green" />
               <span className="font-mono text-[10px] tracking-widest text-green">PROFILE #{profile.id}</span>
               {profile.needs_review ? (
@@ -129,10 +129,10 @@ export default function ProfileDetailPage() {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-semibold text-text-primary">
+            <h1 className="text-2xl font-semibold text-text-primary wrap-break-word">
               {profile.isco_title || 'Occupation pending review'}
             </h1>
-            <p className="font-mono text-xs text-text-secondary mt-1">
+            <p className="font-mono text-xs text-text-secondary mt-1 wrap-break-word">
               ISCO {profile.isco_code || '—'} · {profile.country_code || '—'} ·
               {profile.location_city ? ` ${profile.location_city} ·` : ''} captured {new Date(profile.data_collection_date).toLocaleDateString()}
             </p>

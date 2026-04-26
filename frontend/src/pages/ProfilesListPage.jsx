@@ -120,9 +120,11 @@ export default function ProfilesListPage() {
                       onClick={() => navigate(`/profiles/${p.id}`)}
                     >
                       <td className="px-4 py-3 font-mono text-xs text-text-secondary">#{p.id}</td>
-                      <td className="px-4 py-3 text-text-primary">{p.name || <span className="text-text-muted italic">unnamed</span>}</td>
+                      <td className="px-4 py-3 text-text-primary max-w-48 truncate" title={p.name || ''}>
+                        {p.name || <span className="text-text-muted italic">unnamed</span>}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-text-secondary">{p.country_code || '—'}</td>
-                      <td className="px-4 py-3 text-text-primary truncate max-w-[18rem]">
+                      <td className="px-4 py-3 text-text-primary truncate max-w-[18rem]" title={p.isco_title || ''}>
                         {p.isco_title || <span className="text-text-muted italic">pending review</span>}
                       </td>
                       <td className={`px-4 py-3 font-mono text-xs text-right ${riskColor(p.automation_risk_score)}`}>

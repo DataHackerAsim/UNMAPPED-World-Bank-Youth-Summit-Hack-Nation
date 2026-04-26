@@ -209,36 +209,36 @@ export default function RiskView() {
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-6 fade-in-up delay-2">
-          <div className="bg-red-faint border border-red-dim rounded-lg p-4">
+          <div className="bg-red-faint border border-red-dim rounded-lg p-4 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-red" />
               <p className="font-mono text-[9px] tracking-widest text-red uppercase">At Risk</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               {(risk.at_risk_tasks ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="risk" />
               ))}
             </div>
           </div>
 
-          <div className="bg-green-faint border border-green-muted rounded-lg p-4">
+          <div className="bg-green-faint border border-green-muted rounded-lg p-4 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-green" />
               <p className="font-mono text-[9px] tracking-widest text-green uppercase">Durable</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               {(risk.durable_skills ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="durable" />
               ))}
             </div>
           </div>
 
-          <div className="bg-amber-faint border border-amber-dim rounded-lg p-4">
+          <div className="bg-amber-faint border border-amber-dim rounded-lg p-4 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-amber" />
               <p className="font-mono text-[9px] tracking-widest text-amber uppercase">Adjacent</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               {(risk.adjacent_skills ?? []).map(s => (
                 <SkillTag key={s} label={s} variant="adjacent" />
               ))}

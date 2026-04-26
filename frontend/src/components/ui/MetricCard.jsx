@@ -56,12 +56,14 @@ export default function MetricCard({ label, value, sub, accent = 'teal', trend }
       {/* Value */}
       <p style={{
         fontFamily: "'Fraunces', serif",
-        fontSize: '2rem',
+        fontSize: typeof value === 'string' && value.length > 18 ? '1.25rem' : '2rem',
         fontWeight: '500',
         color: 'var(--color-content-text)',
         margin: 0,
-        lineHeight: 1,
+        lineHeight: 1.15,
         letterSpacing: '-0.02em',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
       }}>
         {value}
       </p>

@@ -65,6 +65,10 @@ export default function OpportunityCard({ opp }) {
           color: 'var(--color-content-text)',
           margin: 0,
           lineHeight: 1.3,
+          minWidth: 0,
+          flex: 1,
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
         }}>
           {opp.title}
         </h3>
@@ -96,6 +100,8 @@ export default function OpportunityCard({ opp }) {
         color: 'var(--color-content-muted)',
         margin: 0,
         lineHeight: 1.55,
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
       }}>
         {opp.match_reason}
       </p>
@@ -104,7 +110,7 @@ export default function OpportunityCard({ opp }) {
       <div style={{ height: '1px', background: 'var(--color-content-border)' }} />
 
       {/* Stats row */}
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
           <p style={{ fontSize: '0.68rem', color: 'var(--color-content-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '500', marginBottom: '3px' }}>
             {t('opp_wage')}
@@ -128,7 +134,7 @@ export default function OpportunityCard({ opp }) {
           <p style={{ fontSize: '0.68rem', color: 'var(--color-content-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '500', marginBottom: '3px' }}>
             Sector
           </p>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-content-text)', margin: 0, fontWeight: '500' }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-content-text)', margin: 0, fontWeight: '500', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
             {opp.sector}
           </p>
         </div>
