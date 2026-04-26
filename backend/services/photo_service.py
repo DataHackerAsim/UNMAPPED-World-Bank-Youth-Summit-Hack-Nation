@@ -25,8 +25,26 @@ logger = logging.getLogger(__name__)
 # ── MinIO client ──────────────────────────────────────────────────
 
 def _get_client() -> Minio:
+    """Internal MinIO client — used by api container ↔ minio container traffic
+    (uploads, deletes, bucket checks). Endpoint must be reachable from the
+    backend host (`minio:9000` inside docker compose, `localhost:9000` locally).
+    """
     return Minio(
         settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=settings.minio_secure,
+    )
+
+
+def _get_public_client() -> Minio:
+    """Presigning client — uses the *browser-reachable* endpoint so the v4
+    signature is computed over the host the browser will actually request.
+    Falls back to the internal client when no override is configured.
+    """
+    public = settings.minio_public_endpoint or settings.minio_endpoint
+    return Minio(
+        public,
         access_key=settings.minio_access_key,
         secret_key=settings.minio_secret_key,
         secure=settings.minio_secure,
@@ -114,9 +132,10 @@ async def caption_photo(file_bytes: bytes) -> str:
 
 
 def get_presigned_url(object_path: str) -> str:
-    """Generate a presigned GET URL for a photo."""
-    client = _get_client()
-    return client.presigned_get_object(
+    """Generate a presigned GET URL for a photo, signed against the public
+    endpoint so the user's browser can fetch it directly from MinIO.
+    """
+    return _get_public_client().presigned_get_object(
         settings.minio_bucket,
         object_path,
         expires=timedelta(hours=settings.presigned_url_expiry_hours),

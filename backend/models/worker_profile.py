@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.sql import func
 
 from core.database import Base
@@ -9,6 +9,11 @@ class WorkerProfile(Base):
 
     # ── Core identity ─────────────────────────────────────────────
     id                          = Column(Integer, primary_key=True, index=True)
+    # FK to users.id — the login account that submitted this profile.
+    # Nullable so legacy rows (created before ownership was wired) are not
+    # silently invisible to admins; non-admins only see rows where this
+    # column equals their own user id.
+    owner_user_id               = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     name                        = Column(String, nullable=True)
     age                         = Column(Integer, nullable=True)
     location_city               = Column(String, nullable=True)
@@ -16,6 +21,7 @@ class WorkerProfile(Base):
     consent_given               = Column(Boolean, default=False, nullable=False)
     data_collection_date        = Column(DateTime(timezone=True), server_default=func.now())
     needs_review                = Column(Boolean, default=False)
+    review_notes                = Column(Text, nullable=True)
 
     # ── Skills input ──────────────────────────────────────────────
     skill_description           = Column(Text, nullable=True)

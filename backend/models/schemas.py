@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Fields that the client must NEVER set — stripped silently before validation
 _AI_FIELDS = {
@@ -39,6 +39,7 @@ class ProfileIn(BaseModel):
 
 class ProfileOut(BaseModel):
     id:                         int
+    owner_user_id:              Optional[int] = None
     name:                       Optional[str]
     age:                        Optional[int]
     location_city:              Optional[str]
@@ -46,6 +47,7 @@ class ProfileOut(BaseModel):
     consent_given:              bool
     data_collection_date:       datetime
     needs_review:               bool
+    review_notes:               Optional[str] = None
     # Skills input
     skill_description:          Optional[str]
     duration_years:             Optional[float]
@@ -74,14 +76,23 @@ class ProfileOut(BaseModel):
     resilience_skills:          List[str]
     displacement_timeline:      Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserCreate(BaseModel):
     username: str
     password: str
     is_admin: bool = False
+
+
+class ReviewIn(BaseModel):
+    """Optional body for PATCH /profiles/{id}/review.
+
+    `reviewed=True` (default) clears the needs_review flag; pass False to
+    re-flag a profile. `review_notes` is persisted alongside the profile.
+    """
+    reviewed:     bool = True
+    review_notes: Optional[str] = None
 
 
 class Token(BaseModel):

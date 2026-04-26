@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
 from core.security import get_current_user, require_admin
-from models.schemas import ProfileIn, ProfileOut
+from models.schemas import ProfileIn, ProfileOut, ReviewIn
 from models.worker_profile import WorkerProfile
 from services import data_layer_service, ilostat_service, llm_service, retrieval_service
 
@@ -92,6 +92,7 @@ async def create_profile(
         )
         db_profile = WorkerProfile(
             **body.model_dump(),
+            owner_user_id=user.id,
             profile_completeness_score=completeness,
             skill_tags=[],
             esco_occupation_uri=None,
@@ -141,6 +142,7 @@ async def create_profile(
     # ── Persist ───────────────────────────────────────────────────
     db_profile = WorkerProfile(
         **body.model_dump(),
+        owner_user_id=user.id,
         profile_completeness_score=completeness,
         skill_tags=skill_tags,
         esco_occupation_uri=esco_uri,
@@ -174,6 +176,11 @@ async def list_profiles(
     user=Depends(get_current_user),
 ):
     q = db.query(WorkerProfile)
+    # Ownership filter: non-admins see only their own profiles. Admins see
+    # everything (including legacy rows with owner_user_id=NULL from before
+    # this column existed).
+    if not user.is_admin:
+        q = q.filter(WorkerProfile.owner_user_id == user.id)
     if country_code:
         q = q.filter(WorkerProfile.country_code == country_code)
     if isco_code:
@@ -187,6 +194,17 @@ async def list_profiles(
     return q.offset(skip).limit(limit).all()
 
 
+def _profile_or_403(db: Session, profile_id: int, user) -> WorkerProfile:
+    """Fetch a profile by id and enforce owner-or-admin access. Returns
+    404 if missing, 403 if the caller is neither the owner nor an admin."""
+    profile = db.query(WorkerProfile).filter(WorkerProfile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(404, detail="Profile not found")
+    if not user.is_admin and profile.owner_user_id != user.id:
+        raise HTTPException(403, detail="You do not have access to this profile")
+    return profile
+
+
 @router.get("/{profile_id}", response_model=ProfileOut)
 async def get_profile(
     request: Request,
@@ -194,10 +212,7 @@ async def get_profile(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    profile = db.query(WorkerProfile).filter(WorkerProfile.id == profile_id).first()
-    if not profile:
-        raise HTTPException(404, detail="Profile not found")
-    return profile
+    return _profile_or_403(db, profile_id, user)
 
 
 @router.delete("/{profile_id}", status_code=204)
@@ -221,6 +236,7 @@ async def delete_profile(
 @router.patch("/{profile_id}/review")
 async def review_profile(
     profile_id: int,
+    body: ReviewIn | None = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
@@ -228,7 +244,19 @@ async def review_profile(
     if not profile:
         raise HTTPException(404, detail="Profile not found")
 
-    profile.needs_review = False
+    if body is None:
+        # Legacy callers (no body) — preserve original behaviour.
+        profile.needs_review = False
+    else:
+        # `reviewed=True` clears the flag; `reviewed=False` re-flags for review.
+        profile.needs_review = not body.reviewed
+        if body.review_notes is not None:
+            profile.review_notes = body.review_notes
+
     db.commit()
     db.refresh(profile)
-    return {"id": profile_id, "needs_review": False}
+    return {
+        "id": profile_id,
+        "needs_review": profile.needs_review,
+        "review_notes": profile.review_notes,
+    }

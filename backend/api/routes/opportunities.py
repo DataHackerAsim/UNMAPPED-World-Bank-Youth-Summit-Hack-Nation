@@ -102,6 +102,8 @@ async def match_opportunities(
     profile = db.query(WorkerProfile).filter(WorkerProfile.id == profile_id).first()
     if not profile:
         raise HTTPException(404, detail="Profile not found")
+    if not user.is_admin and profile.owner_user_id != user.id:
+        raise HTTPException(403, detail="You do not have access to this profile")
 
     skill_tags = profile.skill_tags or []
     task_summary = profile.skill_description or ""

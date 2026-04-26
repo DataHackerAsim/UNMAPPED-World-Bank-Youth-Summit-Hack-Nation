@@ -1,7 +1,9 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env")
     # Auth
     secret_key: str = "dev-secret-change-in-production"
     algorithm: str = "HS256"
@@ -19,6 +21,11 @@ class Settings(BaseSettings):
 
     # MinIO
     minio_endpoint: str = "localhost:9000"
+    # Public MinIO endpoint used to rewrite presigned URLs so the *browser*
+    # can fetch them. Must be reachable from the user's machine (in docker
+    # compose, the api container talks to `minio:9000` internally but the
+    # browser hits `localhost:9000` via the host port mapping).
+    minio_public_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "worker-photos"
@@ -34,9 +41,6 @@ class Settings(BaseSettings):
     min_completeness_score: float = 0.4
     max_photos_per_profile: int = 3
     presigned_url_expiry_hours: int = 1
-
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()

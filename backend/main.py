@@ -11,6 +11,7 @@ Hybrid LLM + Data Layer Architecture:
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from api.routes import auth, health, photos, profiles, risk, opportunities, policy
+from api.routes import auth, health, photos, profiles, risk, opportunities, policy, ilostat, validate
 from core.database import SessionLocal, engine
 from core.security import seed_admin
 from models.user import User          # noqa: F401 — register with Base
@@ -29,11 +30,39 @@ from services import llm_service, photo_service, retrieval_service
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ── Lifespan ──────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ───────────────────────────────────────────────────
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created")
+
+    db = SessionLocal()
+    try:
+        seed_admin(db)
+        logger.info("Admin user seeded")
+    finally:
+        db.close()
+
+    try:
+        photo_service.ensure_bucket()
+    except Exception as exc:
+        logger.warning("MinIO bucket init failed (photos unavailable until MinIO is up): %s", exc)
+
+    logger.info("Retrieval indexes ready: %s", retrieval_service.is_ready())
+
+    ollama_ok = await llm_service.check_health()
+    logger.info("Ollama reachable: %s", ollama_ok)
+
+    yield
+    # ── Shutdown (nothing to clean up) ────────────────────────────
+
 # ── App & rate limiter ────────────────────────────────────────────
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="World Bank Skills Platform", version="1.0.0")
+app = FastAPI(title="World Bank Skills Platform", version="1.0.0", lifespan=lifespan)
 
 # ── CORS — allow frontend dev server ──────────────────────────────
 app.add_middleware(
@@ -47,10 +76,6 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ── Rate-limit decorators on routers ─────────────────────────────
-# Applied per-route inside each router module where needed.
-# Attach limiter to app state so router decorators can resolve it.
-
 # ── Register routers ──────────────────────────────────────────────
 
 app.include_router(auth.router)
@@ -60,25 +85,5 @@ app.include_router(photos.router)
 app.include_router(risk.router)
 app.include_router(opportunities.router)
 app.include_router(policy.router)
-
-
-# ── Startup ───────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def startup():
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created")
-
-    db = SessionLocal()
-    try:
-        seed_admin(db)
-        logger.info("Admin user seeded")
-    finally:
-        db.close()
-
-    photo_service.ensure_bucket()
-
-    logger.info("Retrieval indexes ready: %s", retrieval_service.is_ready())
-
-    ollama_ok = await llm_service.check_health()
-    logger.info("Ollama reachable: %s", ollama_ok)
+app.include_router(ilostat.router)
+app.include_router(validate.router)
