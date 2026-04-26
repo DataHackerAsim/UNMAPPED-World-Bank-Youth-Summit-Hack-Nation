@@ -1,0 +1,126 @@
+services:
+
+  # ── FastAPI App ───────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: worldbank-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/worldbank
+      OLLAMA_BASE_URL: http://ollama:11434
+      MINIO_ENDPOINT: minio:9000
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - embeddings_cache:/app/data/embeddings  # persist TF-IDF index between restarts
+    # ── GPU access ──────────────────────────────────────────────
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - worldbank
+
+  # ── PostgreSQL ────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: worldbank-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: worldbank
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d worldbank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - worldbank
+
+  # ── MinIO (object storage for photos) ────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: worldbank-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - worldbank
+
+  # ── Ollama (LLM inference) ────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: worldbank-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama   # persist downloaded models
+    # ── GPU access ──────────────────────────────────────────────
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - worldbank
+
+  # ── Model pull (one-shot init container) ─────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: worldbank-ollama-init
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+        sleep 5 &&
+        ollama pull llama3.1:8b &&
+        ollama pull llava:7b
+      "
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - ollama
+    networks:
+      - worldbank
+
+# ── Named volumes ─────────────────────────────────────────────
+volumes:
+  postgres_data:
+  minio_data:
+  ollama_models:
+  embeddings_cache:
+
+# ── Network ───────────────────────────────────────────────────
+networks:
+  worldbank:
+    driver: bridge

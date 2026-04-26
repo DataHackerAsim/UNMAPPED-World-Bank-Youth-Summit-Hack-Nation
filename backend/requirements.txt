@@ -1,0 +1,34 @@
+# ── Database drivers ──────────────────────────────────────────────
+psycopg2-binary        # PostgreSQL (Docker); SQLite needs no driver
+
+# ── Core ──────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+sqlalchemy
+passlib[bcrypt]
+bcrypt==4.0.1
+python-jose[cryptography]
+pydantic-settings
+httpx
+python-multipart
+pillow
+minio
+slowapi
+python-dotenv
+
+# ── Data layer ────────────────────────────────────────────────────
+pandas
+numpy
+scikit-learn
+pycountry
+
+# ── Ollama client ─────────────────────────────────────────────────
+ollama
+
+# ── Optional: upgrade retrieval to neural embeddings ──────────────
+# sentence-transformers    # requires torch (~2GB) — uncomment for production
+# torch
+
+# ── Dev / test ────────────────────────────────────────────────────
+pytest
+pytest-asyncio
