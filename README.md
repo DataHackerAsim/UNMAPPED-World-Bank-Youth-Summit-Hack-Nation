@@ -321,6 +321,7 @@ Set `VITE_USE_MOCK=true` in `frontend/.env` to run the entire frontend with a co
 
 **Shawaiz Zafar** — Frontend Deveoper
 
+
 World Bank Youth Summit × Hack-Nation 2026
  
 ---
